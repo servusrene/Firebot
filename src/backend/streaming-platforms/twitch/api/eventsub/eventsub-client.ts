@@ -29,12 +29,13 @@ class TwitchEventSubClient {
         const streamer = AccountAccess.getAccounts().streamer;
 
         // Stream online
-        const onlineSubscription = this._eventSubListener.onStreamOnline(streamer.userId, (event) => {
+        const onlineSubscription = this._eventSubListener.onStreamOnline(streamer.userId, async (event) => {
             TwitchEventHandlers.stream.triggerStreamOnline(
                 event.broadcasterName,
                 event.broadcasterId,
                 event.broadcasterDisplayName
             );
+            await twitchRolesManager.loadSubscribers();
         });
         this._subscriptions.push(onlineSubscription);
 
@@ -815,6 +816,12 @@ class TwitchEventSubClient {
                         event.isPrime,
                         event.type === "resub"
                     );
+                    twitchRolesManager.addSubscriberToSubscribersList(
+                        event.chatterId,
+                        event.chatterName,
+                        event.chatterDisplayName,
+                        event.tier
+                    );
                     break;
 
                 case "community_sub_gift":
@@ -837,6 +844,12 @@ class TwitchEventSubClient {
                         event.cumulativeAmount,
                         event.communityGiftId
                     );
+                    twitchRolesManager.addSubscriberToSubscribersList(
+                        event.recipientId,
+                        event.recipientName,
+                        event.recipientDisplayName,
+                        event.tier
+                    );
                     await viewerDatabase.calculateAutoRanks(event.recipientId);
                     break;
 
@@ -852,6 +865,13 @@ class TwitchEventSubClient {
                             event.gifterDisplayName,
                             upgradeTier
                         );
+
+                        twitchRolesManager.addSubscriberToSubscribersList(
+                            event.chatterId,
+                            event.chatterName,
+                            event.chatterDisplayName,
+                            upgradeTier
+                        );
                     }
                     await viewerDatabase.calculateAutoRanks(event.chatterId);
                     break;
@@ -860,6 +880,12 @@ class TwitchEventSubClient {
                     TwitchEventHandlers.sub.triggerPrimeUpgrade(
                         event.chatterName,
                         event.chatterId,
+                        event.chatterDisplayName,
+                        event.tier
+                    );
+                    twitchRolesManager.addSubscriberToSubscribersList(
+                        event.chatterId,
+                        event.chatterName,
                         event.chatterDisplayName,
                         event.tier
                     );
@@ -872,6 +898,12 @@ class TwitchEventSubClient {
             }
         });
         this._subscriptions.push(chatNotificationSubscription);
+
+        // Subscription ended
+        const subscriptionEndSubscription = this._eventSubListener.onChannelSubscriptionEnd(streamer.userId, (event) => {
+            twitchRolesManager.removeSubscriberFromSubscribersList(event.userId);
+        });
+        this._subscriptions.push(subscriptionEndSubscription);
     }
 
     createClient(): void {
